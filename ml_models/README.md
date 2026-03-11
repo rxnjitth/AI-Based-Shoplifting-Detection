@@ -1,27 +1,62 @@
 # ML Models
 
-This directory contains pre-trained machine learning models.
+This directory contains the two pre-trained YOLOv8 models used by the Smart Theft Detection pipeline.
 
-## YOLOv8n Model
+---
 
-The YOLOv8n model will be automatically downloaded on first run.
+## Models
 
-To manually download:
-```bash
-wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
-```
+### 1. `yolov8m-pose.pt` — Person Detection + Pose Estimation
+| Property | Value |
+|---|---|
+| **Size** | ~52 MB |
+| **Architecture** | YOLOv8m-Pose (medium, keypoint head) |
+| **Purpose** | Detects persons (class 0) AND estimates 17 COCO body keypoints per person |
+| **Tracker** | ByteTrack (built-in via `model.track()`) |
+| **Input** | 640 × 640 px |
+| **Device** | CUDA (RTX 3050) / CPU fallback |
 
-Or using Python:
+Used by: `backend/app/services/person_detector.py` and `pose_estimator.py`
+
+### 2. `yolov8m.pt` — Product / Object Detection
+| Property | Value |
+|---|---|
+| **Size** | ~52 MB |
+| **Architecture** | YOLOv8m (medium, detection head) |
+| **Purpose** | Detects retail products and objects near person's hands |
+| **Classes** | 80 COCO classes |
+| **Input** | 640 × 640 px |
+
+Used by: `backend/app/services/product_detector.py`
+
+---
+
+## Auto-Download
+
+Both models are downloaded automatically on first run if not present:
+
 ```python
 from ultralytics import YOLO
-model = YOLO("yolov8n.pt")  # Will auto-download
+YOLO("yolov8m-pose.pt")  # downloads ~52MB
+YOLO("yolov8m.pt")       # downloads ~52MB
 ```
 
-## Model Information
+## Manual Download
 
-- **YOLOv8n**: Nano version, optimized for speed
-- **Size**: ~6MB
-- **Classes**: 80 COCO classes (person is class 0)
-- **Input**: 640x640 pixels
+```bash
+# From Ultralytics GitHub releases
+wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m-pose.pt
+wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8m.pt
+```
 
-MediaPipe Pose is bundled with the mediapipe package and doesn't require separate model files.
+---
+
+## What Was Removed
+
+| Removed | Reason |
+|---|---|
+| `yolov8n.pt` | Replaced by the more accurate `yolov8m-pose.pt` |
+| `yolov8s.pt` | Duplicate, unused |
+| `pose_landmarker_full.task` | MediaPipe replaced by YOLO keypoints (zero extra inference) |
+
+> **Note:** MediaPipe is no longer used. Pose keypoints come directly from `yolov8m-pose.pt`'s keypoint head — no separate pose model needed.
