@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import VideoUploader from './VideoUploader';
 import LiveDetection from './LiveDetection';
+import RTSPCamera from './RTSPCamera';
 import AlertCard from './AlertCard';
 import EventTimeline from './EventTimeline';
 import StatsPanel from './StatsPanel';
@@ -22,7 +23,7 @@ const Dashboard: React.FC = () => {
   const [minScore, setMinScore] = useState<number>(0);
   const [videoJobId, setVideoJobId] = useState<string>('');
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
-  const [inputMode, setInputMode] = useState<'upload' | 'live'>('live'); // Default to live detection
+  const [inputMode, setInputMode] = useState<'upload' | 'live' | 'rtsp'>('live');
 
   // Fetch alerts
   const fetchAlerts = useCallback(async () => {
@@ -97,6 +98,16 @@ const Dashboard: React.FC = () => {
             📹 Live Detection
           </button>
           <button
+            onClick={() => setInputMode('rtsp')}
+            className={`px-6 py-3 rounded-md font-semibold transition-all ${
+              inputMode === 'rtsp'
+                ? 'bg-primary-600 text-white shadow'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📷 EZVIZ Camera
+          </button>
+          <button
             onClick={() => setInputMode('upload')}
             className={`px-6 py-3 rounded-md font-semibold transition-all ${
               inputMode === 'upload'
@@ -113,6 +124,13 @@ const Dashboard: React.FC = () => {
       {inputMode === 'live' && (
         <div className="mb-8">
           <LiveDetection />
+        </div>
+      )}
+
+      {/* EZVIZ / RTSP Camera Section */}
+      {inputMode === 'rtsp' && (
+        <div className="mb-8">
+          <RTSPCamera />
         </div>
       )}
 

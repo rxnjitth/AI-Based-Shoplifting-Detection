@@ -87,55 +87,54 @@ class InteractionDetector:
     def _detect_hand_zone(self, hand: Dict, landmarks: Dict, side: str) -> str:
         """
         Detect which zone a hand is in based on position relative to body.
-        
-        Args:
-            hand: Hand landmark
-            landmarks: All pose landmarks
-            side: "left" or "right"
-            
-        Returns:
-            Zone name: "shelf", "pocket", "bag", "basket", "neutral"
+        Uses relative body proportions instead of fixed pixel distances so
+        detection works regardless of camera distance or resolution.
         """
-        if hand["visibility"] < 0.5:
+        if hand["visibility"] < 0.4:
             return "unknown"
-        
+
         hand_y = hand["y"]
         hand_x = hand["x"]
-        
-        # Reference points
-        shoulder_y = landmarks[f"{side}_shoulder"]["y"]
-        waist_y = landmarks["waist"]["y"]
-        hip_y = landmarks[f"{side}_hip"]["y"]
-        shoulder_x = landmarks[f"{side}_shoulder"]["x"]
-        torso_center_x = (landmarks["left_shoulder"]["x"] + landmarks["right_shoulder"]["x"]) / 2
-        
-        # Calculate relative positions
-        y_from_shoulder = hand_y - shoulder_y
-        y_from_waist = hand_y - waist_y
-        x_from_shoulder = abs(hand_x - shoulder_x)
-        
-        # Zone detection heuristics
-        
-        # SHELF: Hand above waist, reaching outward.
-        if hand_y < waist_y and x_from_shoulder > 45:
+
+        shoulder_y  = landmarks[f"{side}_shoulder"]["y"]
+        waist_y     = landmarks["waist"]["y"]
+        hip_y       = landmarks[f"{side}_hip"]["y"]
+        shoulder_x  = landmarks[f"{side}_shoulder"]["x"]
+        torso_center_x = (
+            landmarks["left_shoulder"]["x"] + landmarks["right_shoulder"]["x"]
+        ) / 2
+
+        # Body height reference — distance from shoulder to hip
+        body_height = max(1.0, abs(hip_y - shoulder_y))
+
+        x_from_shoulder   = abs(hand_x - shoulder_x)
+        x_from_center     = abs(hand_x - torso_center_x)
+
+        # Normalised thresholds (fraction of body_height)
+        # These stay consistent regardless of camera distance / resolution
+        reach_threshold   = body_height * 0.35   # hand extended outward
+        pocket_x_max      = body_height * 0.45   # close to body side
+        center_x_max      = body_height * 0.70   # close to torso centre
+        bag_x_min         = body_height * 0.60   # clearly away from centre
+        basket_x_min      = body_height * 0.65   # further away, below hips
+
+        # SHELF: hand above waist and reaching outward
+        if hand_y < waist_y and x_from_shoulder > reach_threshold:
             return "shelf"
 
-        # BASKET/TROLLEY: Hand is lower than hips and away from torso centerline.
-        # This typically represents placing picked products into a cart/basket.
-        if hand_y >= (hip_y - 10) and abs(hand_x - torso_center_x) > 80:
+        # BASKET/TROLLEY: hand below hips and away from torso
+        if hand_y >= (hip_y - body_height * 0.08) and x_from_center > basket_x_min:
             return "basket"
-        
-        # POCKET: Hand near same-side hip and close to body centerline.
-        if waist_y < hand_y < (hip_y + 70):
-            if x_from_shoulder < 55 and abs(hand_x - torso_center_x) < 85:
+
+        # POCKET: hand between waist and lower hip, close to body
+        if waist_y < hand_y < (hip_y + body_height * 0.55):
+            if x_from_shoulder < pocket_x_max and x_from_center < center_x_max:
                 return "pocket"
-        
-        # BAG: Hand at torso level and away from centerline.
-        if shoulder_y < hand_y < hip_y:
-            if x_from_shoulder > 80:
-                return "bag"
-        
-        # NEUTRAL: Other positions
+
+        # BAG: hand at torso level, clearly away from centre
+        if shoulder_y < hand_y < hip_y and x_from_shoulder > bag_x_min:
+            return "bag"
+
         return "neutral"
     
     def _classify_action(self, landmarks: Dict, side: str, zone: str) -> str:
@@ -169,15 +168,23 @@ class InteractionDetector:
         )
         
         extension_ratio = hand_to_shoulder_dist / (elbow_to_shoulder_dist + 1e-6)
-        
+
+        # Body height for relative threshold
+        body_height = max(1.0, abs(
+            landmarks[f"{side}_hip"]["y"] - landmarks[f"{side}_shoulder"]["y"]
+        ))
+
         # Zone-aware action classification keeps normal shopping behavior from
         # being mislabeled as concealment.
         if zone == "basket":
             return "placing"
 
-        if extension_ratio > 1.5 and zone == "shelf":
+        if extension_ratio > 1.3 and zone == "shelf":
             return "reaching"
-        elif extension_ratio < 0.8 and zone == "pocket" and hand["y"] > waist["y"]:
+        elif (extension_ratio < 0.9
+              and zone == "pocket"
+              and hand["y"] > waist["y"]
+              and hand_to_shoulder_dist < body_height * 0.6):
             return "concealing"
         else:
             return "idle"
