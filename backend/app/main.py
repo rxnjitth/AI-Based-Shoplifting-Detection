@@ -11,7 +11,7 @@ import os
 from app.config import settings
 from app.database import init_db
 from app.models import HealthCheckResponse
-from app.routers import alerts, videos, stats, live
+from app.routers import alerts, videos, stats, live, rtsp
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -35,6 +35,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(videos.router, prefix="/api/videos", tags=["videos"])
 app.include_router(stats.router, prefix="/api/stats", tags=["statistics"])
 app.include_router(live.router, prefix="/api/live", tags=["live-detection"])
+app.include_router(rtsp.router, prefix="/api/rtsp", tags=["rtsp-cameras"])
 
 # Mount static file directories for serving evidence
 if os.path.exists(settings.evidence_snapshots_dir):
