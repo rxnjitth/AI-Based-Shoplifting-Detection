@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     # Evidence Settings
     clip_duration_before: int = 5
     clip_duration_after: int = 5
+
+    # EZVIZ / RTSP Camera defaults (override per-request or via env)
+    ezviz_camera_id: str = "ezviz-1"
+    ezviz_rtsp_url: str = ""
+    ezviz_default_port: int = 554
+    ezviz_default_channel: int = 1
+    ezviz_default_stream: str = "main"
     
     class Config:
         # Support running from either project root or backend directory.
