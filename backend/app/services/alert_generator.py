@@ -259,6 +259,46 @@ class AlertGenerator:
         # Return only the filename (not full path) for URL construction
         return clip_filename
     
+    async def create_live_alert(self, alert_data: Dict, db_session):
+        """
+        Persist an alert generated from the live camera feed.
+        No video file is available, so snapshot/clip paths are omitted.
+
+        Args:
+            alert_data: Alert data dict from BehaviorAnalyzer.generate_alerts()
+            db_session: SQLAlchemy database session
+        """
+        alert = Alert(
+            timestamp=datetime.utcnow(),
+            suspicion_score=alert_data["suspicion_score"],
+            reason=alert_data["reason"],
+            person_bbox=self._bbox_to_string(alert_data["person_bbox"]),
+            video_path="live",
+            snapshot_path=None,
+            clip_path=None,
+            status=AlertStatus.NEW,
+            frame_number=alert_data["frame_number"],
+        )
+
+        db_session.add(alert)
+        db_session.flush()
+
+        for transition in alert_data.get("zone_transitions", []):
+            event = Event(
+                alert_id=alert.id,
+                event_type=transition,
+                timestamp=datetime.utcnow(),
+                event_metadata=f"Duration: {alert_data.get('duration', 0):.2f}s",
+            )
+            db_session.add(event)
+
+        db_session.commit()
+        print(
+            f"🚨 Live alert: ID={alert.id}, "
+            f"Score={alert.suspicion_score:.1f}, "
+            f"Reason={alert.reason}"
+        )
+
     def _bbox_to_string(self, bbox: list) -> str:
         """Convert bounding box to string format."""
         return ",".join([f"{coord:.2f}" for coord in bbox])
