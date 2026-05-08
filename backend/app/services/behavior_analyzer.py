@@ -103,8 +103,9 @@ class BehaviorAnalyzer:
         self.frame_buffer.append(behavior_frame)
         self.zone_history.append(interaction["primary_zone"])
         
-        # Analyze window
-        if len(self.frame_buffer) >= self.window_size:
+        # Analyze window — start scoring after half the window is filled
+        # so short interactions aren't missed
+        if len(self.frame_buffer) >= max(self.window_size // 2, 10):
             self._analyze_window()
     
     def _analyze_window(self):
@@ -225,7 +226,8 @@ class BehaviorAnalyzer:
     def generate_alerts(self) -> List[Dict]:
         """
         Generate alerts from detected suspicious sequences.
-        
+        Finalizes any ongoing sequence. Use for end-of-video processing.
+
         Returns:
             List of alert data dictionaries
         """
@@ -233,25 +235,42 @@ class BehaviorAnalyzer:
         if self.current_sequence is not None:
             self.suspicious_sequences.append(self.current_sequence)
             self.current_sequence = None
-        
-        # Convert sequences to alert data
+
+        return self._sequences_to_alerts()
+
+    def flush_completed_alerts(self) -> List[Dict]:
+        """
+        Return alerts only for sequences that have already ended
+        (score dropped below threshold). Active sequences are left intact.
+        Use this during live detection to avoid prematurely closing an
+        ongoing suspicious event.
+
+        Returns:
+            List of alert data dictionaries for completed sequences only
+        """
+        completed = list(self.suspicious_sequences)
+        self.suspicious_sequences.clear()
+        return self._sequences_to_alerts(completed)
+
+    def _sequences_to_alerts(self, sequences: Optional[List] = None) -> List[Dict]:
+        """Convert a list of SuspiciousSequence objects to alert dicts."""
+        if sequences is None:
+            sequences = self.suspicious_sequences
         alerts = []
-        
-        for sequence in self.suspicious_sequences:
+        for sequence in sequences:
             alert_data = {
                 "frame_number": sequence.peak_frame,
                 "timestamp": sequence.peak_timestamp,
-                "suspicion_score": min(100, sequence.suspicion_score),  # Cap at 100
+                "suspicion_score": min(100, sequence.suspicion_score),
                 "reason": sequence.reason,
                 "person_bbox": sequence.person_bbox,
                 "track_id": sequence.track_id,
                 "zone_transitions": sequence.zone_transitions,
                 "start_frame": sequence.start_frame,
                 "end_frame": sequence.end_frame,
-                "duration": sequence.end_timestamp - sequence.start_timestamp
+                "duration": sequence.end_timestamp - sequence.start_timestamp,
             }
             alerts.append(alert_data)
-        
         return alerts
     
     def reset(self):
@@ -268,7 +287,7 @@ class BehaviorAnalyzer:
         Returns:
             Current suspicion score (0-100)
         """
-        if len(self.frame_buffer) < self.window_size // 2:
+        if len(self.frame_buffer) < max(self.window_size // 4, 5):
             return 0
         
         frames = list(self.frame_buffer)
