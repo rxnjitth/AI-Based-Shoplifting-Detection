@@ -9,10 +9,10 @@ interface Detection {
   person: {
     bbox: number[];
     confidence: number;
+    track_id: number | null;
   };
   pose: {
     detected: boolean;
-    landmarks_count: number;
   };
   interaction: {
     zone: string;
@@ -20,6 +20,7 @@ interface Detection {
     right_hand_action: string;
     nearby_products: number;
   };
+  suspicion_score: number;
   suspicious: boolean;
 }
 
@@ -46,7 +47,9 @@ const LiveDetection: React.FC = () => {
   const animationRef = useRef<number>();
   const lastFrameTime = useRef<number>(0);
   const frameCount = useRef<number>(0);
-  const fpsInterval = useRef<number>(1000); // Update FPS every second
+  const fpsInterval = useRef<number>(1000);
+  // Stable session ID for the lifetime of this component instance
+  const sessionId = useRef<string>(crypto.randomUUID());
 
   // Enumerate cameras
   const enumerateCameras = async () => {
@@ -100,6 +103,10 @@ const LiveDetection: React.FC = () => {
     if (animationRef.current) {
       clearTimeout(animationRef.current);
     }
+    // Tell backend to release session state
+    liveApi.endSession(sessionId.current).catch(() => {});
+    // Generate a fresh session ID for the next start
+    sessionId.current = crypto.randomUUID();
   };
 
   // Update video element when stream changes
@@ -147,7 +154,7 @@ const LiveDetection: React.FC = () => {
 
     try {
       setProcessing(true);
-      const result = await liveApi.detectFrame(imageData);
+      const result = await liveApi.detectFrame(imageData, sessionId.current);
       setDetectionResult(result);
       
       // Draw bounding boxes
@@ -348,6 +355,9 @@ const LiveDetection: React.FC = () => {
                     </div>
                     <div className="text-sm text-gray-600">
                       Left: {det.interaction.left_hand_action} | Right: {det.interaction.right_hand_action}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Suspicion score: <span className={`font-medium ${det.suspicion_score >= 70 ? 'text-red-600' : 'text-gray-700'}`}>{det.suspicion_score}</span>
                     </div>
                     {det.interaction.nearby_products > 0 && (
                       <div className="text-sm text-orange-600">
