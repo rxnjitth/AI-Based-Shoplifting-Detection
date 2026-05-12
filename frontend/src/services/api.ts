@@ -101,11 +101,55 @@ export const videosApi = {
 export const liveApi = {
   /**
    * Detect objects in a single frame (base64 encoded).
+   * session_id must be stable for the duration of a camera session.
    */
-  detectFrame: async (imageData: string): Promise<any> => {
+  detectFrame: async (imageData: string, sessionId: string = 'default'): Promise<any> => {
     const response = await api.post('/api/live/detect-frame-base64', {
       image: imageData,
+      session_id: sessionId,
     });
+    return response.data;
+  },
+
+  /**
+   * End a live detection session and release backend state.
+   */
+  endSession: async (sessionId: string): Promise<void> => {
+    await api.delete(`/api/live/session/${sessionId}`);
+  },
+};
+
+export const rtspApi = {
+  connect: async (payload: {
+    camera_id: string;
+    rtsp_url?: string;
+    ip?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    channel?: number;
+    stream?: string;
+  }): Promise<any> => {
+    const response = await api.post('/api/rtsp/connect', payload);
+    return response.data;
+  },
+
+  disconnect: async (cameraId: string): Promise<void> => {
+    await api.delete(`/api/rtsp/disconnect/${cameraId}`);
+  },
+
+  getStatus: async (cameraId: string): Promise<any> => {
+    const response = await api.get(`/api/rtsp/status/${cameraId}`);
+    return response.data;
+  },
+
+  listCameras: async (): Promise<any> => {
+    const response = await api.get('/api/rtsp/cameras');
+    return response.data;
+  },
+
+  getDefaultCamera: async (): Promise<any> => {
+    const response = await api.get('/api/rtsp/default-camera');
     return response.data;
   },
 };
