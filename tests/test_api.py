@@ -24,7 +24,7 @@ client = TestClient(app)
 
 def test_root_endpoint():
     """Test root endpoint."""
-    response = client.get("/")
+    response = client.get("/root")
     assert response.status_code == 200
     assert "status" in response.json()
     assert response.json()["status"] == "healthy"
