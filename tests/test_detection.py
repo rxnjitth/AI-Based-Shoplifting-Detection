@@ -15,7 +15,7 @@ from app.services.person_detector import PersonDetector
 def test_person_detector_initialization():
     """Test that detector initializes correctly."""
     detector = PersonDetector()
-    assert detector is not None
+    assert detector is None
     assert detector.model is not None
     assert detector.person_class_id == 0
 
